@@ -1,6 +1,8 @@
 package com.kptgames.secondthought.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material3.*
@@ -10,7 +12,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kptgames.secondthought.data.model.durationOptions
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     currentName: String,
@@ -18,7 +22,8 @@ fun SettingsScreen(
     remindOnStart: Boolean,
     nudgeDuring: Boolean,
     congratulate: Boolean,
-    onSaveClick: (name: String, remindBefore: Boolean, remindOnStart: Boolean, nudgeDuring: Boolean, congratulate: Boolean) -> Unit,
+    defaultSlotDuration: Int,
+    onSaveClick: (name: String, remindBefore: Boolean, remindOnStart: Boolean, nudgeDuring: Boolean, congratulate: Boolean, slotDuration: Int) -> Unit,
     onLogoutClick: () -> Unit,
     isLoading: Boolean = false,
     saveSuccess: Boolean = false
@@ -28,18 +33,23 @@ fun SettingsScreen(
     var localRemindOnStart by remember(remindOnStart) { mutableStateOf(remindOnStart) }
     var localNudgeDuring by remember(nudgeDuring) { mutableStateOf(nudgeDuring) }
     var localCongratulate by remember(congratulate) { mutableStateOf(congratulate) }
+    var localSlotDuration by remember(defaultSlotDuration) { mutableStateOf(defaultSlotDuration) }
     var showSuccessMessage by remember { mutableStateOf(false) }
-    
+    var durationDropdownExpanded by remember { mutableStateOf(false) }
+
+    val scrollState = rememberScrollState()
+
     // Show success message when save succeeds
     LaunchedEffect(saveSuccess) {
         if (saveSuccess) {
             showSuccessMessage = true
         }
     }
-    
+
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(scrollState)
             .padding(24.dp)
     ) {
         // Header
@@ -48,9 +58,9 @@ fun SettingsScreen(
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold
         )
-        
+
         Spacer(modifier = Modifier.height(32.dp))
-        
+
         // Profile section
         Text(
             text = "Profile",
@@ -58,13 +68,13 @@ fun SettingsScreen(
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.primary
         )
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         // Name field
         OutlinedTextField(
             value = name,
-            onValueChange = { 
+            onValueChange = {
                 name = it
                 showSuccessMessage = false
             },
@@ -73,9 +83,60 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxWidth(),
             enabled = !isLoading
         )
-        
+
         Spacer(modifier = Modifier.height(32.dp))
-        
+
+        // Schedule section
+        Text(
+            text = "Schedule",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.primary
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Default slot duration dropdown
+        Text(
+            text = "Default Time Block Duration",
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        ExposedDropdownMenuBox(
+            expanded = durationDropdownExpanded,
+            onExpandedChange = { durationDropdownExpanded = it }
+        ) {
+            OutlinedTextField(
+                value = durationOptions.find { it.minutes == localSlotDuration }?.label ?: "1 hour",
+                onValueChange = {},
+                readOnly = true,
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = durationDropdownExpanded) },
+                modifier = Modifier
+                    .menuAnchor()
+                    .fillMaxWidth(),
+                enabled = !isLoading
+            )
+            ExposedDropdownMenu(
+                expanded = durationDropdownExpanded,
+                onDismissRequest = { durationDropdownExpanded = false }
+            ) {
+                durationOptions.forEach { option ->
+                    DropdownMenuItem(
+                        text = { Text(option.label) },
+                        onClick = {
+                            localSlotDuration = option.minutes
+                            durationDropdownExpanded = false
+                            showSuccessMessage = false
+                        }
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
         // Notifications section
         Text(
             text = "Notifications",
@@ -83,13 +144,13 @@ fun SettingsScreen(
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.primary
         )
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         // Remind 10 minutes prior
         SettingsCheckbox(
             checked = localRemindBefore,
-            onCheckedChange = { 
+            onCheckedChange = {
                 localRemindBefore = it
                 showSuccessMessage = false
             },
@@ -97,11 +158,11 @@ fun SettingsScreen(
             subtitle = "Get notified before each activity starts",
             enabled = !isLoading
         )
-        
+
         // Remind on start
         SettingsCheckbox(
             checked = localRemindOnStart,
-            onCheckedChange = { 
+            onCheckedChange = {
                 localRemindOnStart = it
                 showSuccessMessage = false
             },
@@ -109,11 +170,11 @@ fun SettingsScreen(
             subtitle = "Get notified when it's time to begin",
             enabled = !isLoading
         )
-        
+
         // Nudge during
         SettingsCheckbox(
             checked = localNudgeDuring,
-            onCheckedChange = { 
+            onCheckedChange = {
                 localNudgeDuring = it
                 showSuccessMessage = false
             },
@@ -121,11 +182,11 @@ fun SettingsScreen(
             subtitle = "Get a gentle reminder midway through",
             enabled = !isLoading
         )
-        
+
         // Congratulate on finish
         SettingsCheckbox(
             checked = localCongratulate,
-            onCheckedChange = { 
+            onCheckedChange = {
                 localCongratulate = it
                 showSuccessMessage = false
             },
@@ -133,7 +194,7 @@ fun SettingsScreen(
             subtitle = "Celebrate when you complete a task",
             enabled = !isLoading
         )
-        
+
         // Success message
         if (showSuccessMessage) {
             Spacer(modifier = Modifier.height(8.dp))
@@ -143,13 +204,13 @@ fun SettingsScreen(
                 fontSize = 14.sp
             )
         }
-        
-        Spacer(modifier = Modifier.height(24.dp))
-        
+
+        Spacer(modifier = Modifier.height(32.dp))
+
         // Save button
         Button(
-            onClick = { 
-                onSaveClick(name, localRemindBefore, localRemindOnStart, localNudgeDuring, localCongratulate) 
+            onClick = {
+                onSaveClick(name, localRemindBefore, localRemindOnStart, localNudgeDuring, localCongratulate, localSlotDuration)
             },
             modifier = Modifier
                 .fillMaxWidth()
@@ -165,10 +226,10 @@ fun SettingsScreen(
                 Text("Save", fontSize = 16.sp)
             }
         }
-        
-        Spacer(modifier = Modifier.weight(1f))
-        
-        // Logout button at bottom
+
+        Spacer(modifier = Modifier.height(48.dp))
+
+        // Logout button
         OutlinedButton(
             onClick = onLogoutClick,
             modifier = Modifier
@@ -186,8 +247,9 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.width(8.dp))
             Text("Log Out", fontSize = 16.sp)
         }
-        
-        Spacer(modifier = Modifier.height(16.dp))
+
+        // Bottom padding for safe area
+        Spacer(modifier = Modifier.height(32.dp))
     }
 }
 

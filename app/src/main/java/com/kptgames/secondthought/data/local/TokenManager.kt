@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -26,6 +27,7 @@ class TokenManager(private val context: Context) {
         private val REMIND_ON_START_KEY = booleanPreferencesKey("remind_on_start")
         private val NUDGE_DURING_KEY = booleanPreferencesKey("nudge_during")
         private val CONGRATULATE_KEY = booleanPreferencesKey("congratulate")
+        private val DEFAULT_SLOT_DURATION_KEY = intPreferencesKey("default_slot_duration")
     }
     
     // Save tokens after login/signup
@@ -108,5 +110,17 @@ class TokenManager(private val context: Context) {
     
     fun getCongratulate(): Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[CONGRATULATE_KEY] ?: true
+    }
+    
+    // Save default slot duration (in minutes)
+    suspend fun saveDefaultSlotDuration(minutes: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[DEFAULT_SLOT_DURATION_KEY] = minutes
+        }
+    }
+    
+    // Get default slot duration (default 60 minutes)
+    fun getDefaultSlotDuration(): Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[DEFAULT_SLOT_DURATION_KEY] ?: 60
     }
 }

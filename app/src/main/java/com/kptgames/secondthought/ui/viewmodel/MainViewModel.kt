@@ -31,6 +31,7 @@ data class SettingsUiState(
     val remindOnStart: Boolean = true,
     val nudgeDuring: Boolean = true,
     val congratulate: Boolean = true,
+    val defaultSlotDuration: Int = 60,
     val saveSuccess: Boolean = false,
     val errorMessage: String? = null
 )
@@ -38,7 +39,6 @@ data class SettingsUiState(
 // UI State for Main screen
 data class MainUiState(
     val tasks: List<TaskBlock> = listOf(TaskBlock()),
-    val useSlots: Boolean = true,
     val isSaving: Boolean = false,
     val saveMessage: String? = null
 )
@@ -47,19 +47,19 @@ class MainViewModel(
     private val repository: Repository,
     private val tokenManager: TokenManager
 ) : ViewModel() {
-
+    
     // Auth state
     private val _authState = MutableStateFlow(AuthUiState())
     val authState: StateFlow<AuthUiState> = _authState.asStateFlow()
-
+    
     // Settings state
     private val _settingsState = MutableStateFlow(SettingsUiState())
     val settingsState: StateFlow<SettingsUiState> = _settingsState.asStateFlow()
-
+    
     // Main screen state
     private val _mainState = MutableStateFlow(MainUiState())
     val mainState: StateFlow<MainUiState> = _mainState.asStateFlow()
-
+    
     init {
         // Check if user is already logged in (skip in dev mode)
         if (!DEV_BYPASS_LOGIN) {
@@ -69,14 +69,14 @@ class MainViewModel(
                 }
             }
         }
-
+        
         // Load saved user name
         viewModelScope.launch {
             tokenManager.getUserName().collect { name ->
                 _settingsState.value = _settingsState.value.copy(userName = name)
             }
         }
-
+        
         // Load notification settings
         viewModelScope.launch {
             tokenManager.getRemindBefore().collect { value ->
@@ -98,16 +98,23 @@ class MainViewModel(
                 _settingsState.value = _settingsState.value.copy(congratulate = value)
             }
         }
-
+        
+        // Load default slot duration
+        viewModelScope.launch {
+            tokenManager.getDefaultSlotDuration().collect { duration ->
+                _settingsState.value = _settingsState.value.copy(defaultSlotDuration = duration)
+            }
+        }
+        
         // Load today's schedule if exists
         loadTodaySchedule()
     }
-
+    
     // Login
     fun login(username: String, password: String) {
         viewModelScope.launch {
             _authState.value = _authState.value.copy(isLoading = true, errorMessage = null)
-
+            
             when (val result = repository.login(username, password)) {
                 is Result.Success -> {
                     _authState.value = _authState.value.copy(
@@ -125,12 +132,12 @@ class MainViewModel(
             }
         }
     }
-
+    
     // Signup
     fun signup(username: String, password: String) {
         viewModelScope.launch {
             _authState.value = _authState.value.copy(isLoading = true, errorMessage = null)
-
+            
             when (val result = repository.signup(username, password)) {
                 is Result.Success -> {
                     _authState.value = _authState.value.copy(
@@ -148,7 +155,7 @@ class MainViewModel(
             }
         }
     }
-
+    
     // Logout
     fun logout() {
         viewModelScope.launch {
@@ -158,19 +165,20 @@ class MainViewModel(
             _mainState.value = MainUiState()
         }
     }
-
+    
     // Clear auth error
     fun clearAuthError() {
         _authState.value = _authState.value.copy(errorMessage = null)
     }
-
-    // Save settings (name + notifications)
+    
+    // Save settings (name + notifications + slot duration)
     fun saveSettings(
         name: String,
         remindBefore: Boolean,
         remindOnStart: Boolean,
         nudgeDuring: Boolean,
-        congratulate: Boolean
+        congratulate: Boolean,
+        slotDuration: Int
     ) {
         viewModelScope.launch {
             _settingsState.value = _settingsState.value.copy(
@@ -178,8 +186,8 @@ class MainViewModel(
                 saveSuccess = false,
                 errorMessage = null
             )
-
-            when (val result = repository.updateSettings(name, remindBefore, remindOnStart, nudgeDuring, congratulate)) {
+            
+            when (val result = repository.updateSettings(name, remindBefore, remindOnStart, nudgeDuring, congratulate, slotDuration)) {
                 is Result.Success -> {
                     _settingsState.value = _settingsState.value.copy(
                         isLoading = false,
@@ -188,6 +196,7 @@ class MainViewModel(
                         remindOnStart = remindOnStart,
                         nudgeDuring = nudgeDuring,
                         congratulate = congratulate,
+                        defaultSlotDuration = slotDuration,
                         saveSuccess = true
                     )
                 }
@@ -201,36 +210,43 @@ class MainViewModel(
             }
         }
     }
-
-    // Toggle between slots and custom time
-    fun setUseSlots(useSlots: Boolean) {
-        _mainState.value = _mainState.value.copy(useSlots = useSlots)
-    }
-
+    
     // Update a specific task
     fun updateTask(index: Int, task: TaskBlock) {
         val currentTasks = _mainState.value.tasks.toMutableList()
         currentTasks[index] = task
-
+        
         // Auto-add new block if typing in the last one (and not ending at midnight)
         if (index == currentTasks.size - 1 && task.task.isNotEmpty()) {
             val lastTask = currentTasks.last()
             // Don't add if end time is midnight (0:00) or 23:59
             if (!(lastTask.endHour == 0 || (lastTask.endHour == 23 && lastTask.endMinute >= 59))) {
-                // Create new task starting where last one ended
+                // Calculate new end time based on default slot duration
+                val durationMinutes = _settingsState.value.defaultSlotDuration
+                val startTotalMinutes = lastTask.endHour * 60 + lastTask.endMinute
+                var endTotalMinutes = startTotalMinutes + durationMinutes
+                
+                // Cap at 23:59
+                if (endTotalMinutes >= 24 * 60) {
+                    endTotalMinutes = 23 * 60 + 59
+                }
+                
+                val newEndHour = endTotalMinutes / 60
+                val newEndMinute = endTotalMinutes % 60
+                
                 val newTask = TaskBlock(
                     startHour = lastTask.endHour,
                     startMinute = lastTask.endMinute,
-                    endHour = if (lastTask.endHour >= 23) 23 else lastTask.endHour + 1,
-                    endMinute = if (lastTask.endHour >= 23) 59 else lastTask.endMinute
+                    endHour = newEndHour,
+                    endMinute = newEndMinute
                 )
                 currentTasks.add(newTask)
             }
         }
-
+        
         _mainState.value = _mainState.value.copy(tasks = currentTasks, saveMessage = null)
     }
-
+    
     // Delete a task
     fun deleteTask(index: Int) {
         val currentTasks = _mainState.value.tasks.toMutableList()
@@ -239,16 +255,16 @@ class MainViewModel(
             _mainState.value = _mainState.value.copy(tasks = currentTasks, saveMessage = null)
         }
     }
-
+    
     // Save schedule
     fun saveSchedule() {
         viewModelScope.launch {
             _mainState.value = _mainState.value.copy(isSaving = true, saveMessage = null)
-
+            
             val now = LocalDateTime.now()
             val dateStr = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
             val timestampStr = now.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-
+            
             // Convert tasks to JSON format
             val taskJsonList = _mainState.value.tasks
                 .filter { it.task.isNotBlank() }
@@ -257,19 +273,17 @@ class MainViewModel(
                         id = task.id,
                         startTime = String.format("%02d:%02d", task.startHour, task.startMinute),
                         endTime = String.format("%02d:%02d", task.endHour, task.endMinute),
-                        task = task.task,
-                        slotName = task.slotIndex?.let { predefinedSlots.getOrNull(it)?.label }
+                        task = task.task
                     )
                 }
-
+            
             val schedule = DailySchedule(
                 date = dateStr,
                 createdAt = timestampStr,
                 updatedAt = timestampStr,
-                useSlots = _mainState.value.useSlots,
                 tasks = taskJsonList
             )
-
+            
             when (val result = repository.saveSchedule(schedule)) {
                 is Result.Success -> {
                     _mainState.value = _mainState.value.copy(
@@ -287,13 +301,13 @@ class MainViewModel(
             }
         }
     }
-
+    
     // Load today's schedule from local storage
     private fun loadTodaySchedule() {
         viewModelScope.launch {
             val dateStr = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
             val schedule = repository.loadScheduleFromFile(dateStr)
-
+            
             if (schedule != null && schedule.tasks.isNotEmpty()) {
                 val tasks = schedule.tasks.map { taskJson ->
                     val startParts = taskJson.startTime.split(":")
@@ -304,20 +318,14 @@ class MainViewModel(
                         startMinute = startParts[1].toIntOrNull() ?: 0,
                         endHour = endParts[0].toIntOrNull() ?: 10,
                         endMinute = endParts[1].toIntOrNull() ?: 0,
-                        task = taskJson.task,
-                        slotIndex = taskJson.slotName?.let { name ->
-                            predefinedSlots.indexOfFirst { it.label == name }.takeIf { it >= 0 }
-                        }
+                        task = taskJson.task
                     )
                 }
-                _mainState.value = _mainState.value.copy(
-                    tasks = tasks,
-                    useSlots = schedule.useSlots
-                )
+                _mainState.value = _mainState.value.copy(tasks = tasks)
             }
         }
     }
-
+    
     // ==========================================
     // DEV BYPASS - Comment this out for production
     // ==========================================

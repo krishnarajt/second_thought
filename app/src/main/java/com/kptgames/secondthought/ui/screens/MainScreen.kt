@@ -16,7 +16,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kptgames.secondthought.data.model.TaskBlock
-import com.kptgames.secondthought.data.model.predefinedSlots
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -26,8 +25,6 @@ import java.time.format.DateTimeFormatter
 fun MainScreen(
     userName: String,
     tasks: List<TaskBlock>,
-    useSlots: Boolean,
-    onUseSlotsChange: (Boolean) -> Unit,
     onTaskUpdate: (Int, TaskBlock) -> Unit,
     onTaskDelete: (Int) -> Unit,
     onSaveClick: () -> Unit,
@@ -62,28 +59,7 @@ fun MainScreen(
             )
         }
         
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // Mode Selector (Slots vs Custom)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            FilterChip(
-                selected = useSlots,
-                onClick = { onUseSlotsChange(true) },
-                label = { Text("Time Slots") },
-                modifier = Modifier.padding(end = 8.dp)
-            )
-            FilterChip(
-                selected = !useSlots,
-                onClick = { onUseSlotsChange(false) },
-                label = { Text("Custom Time") }
-            )
-        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(20.dp))
         
         // Task List
         LazyColumn(
@@ -93,7 +69,6 @@ fun MainScreen(
             itemsIndexed(tasks) { index, task ->
                 TaskBlockCard(
                     task = task,
-                    useSlots = useSlots,
                     onTaskUpdate = { updatedTask -> onTaskUpdate(index, updatedTask) },
                     onDelete = { onTaskDelete(index) },
                     showDelete = tasks.size > 1
@@ -138,14 +113,12 @@ fun MainScreen(
 @Composable
 fun TaskBlockCard(
     task: TaskBlock,
-    useSlots: Boolean,
     onTaskUpdate: (TaskBlock) -> Unit,
     onDelete: () -> Unit,
     showDelete: Boolean
 ) {
     var showStartTimePicker by remember { mutableStateOf(false) }
     var showEndTimePicker by remember { mutableStateOf(false) }
-    var slotDropdownExpanded by remember { mutableStateOf(false) }
     
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -163,86 +136,42 @@ fun TaskBlockCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (useSlots) {
-                    // Slot Dropdown
-                    ExposedDropdownMenuBox(
-                        expanded = slotDropdownExpanded,
-                        onExpandedChange = { slotDropdownExpanded = it },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        OutlinedTextField(
-                            value = task.slotIndex?.let { predefinedSlots.getOrNull(it)?.label } ?: "Select slot",
-                            onValueChange = {},
-                            readOnly = true,
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = slotDropdownExpanded) },
-                            modifier = Modifier
-                                .menuAnchor()
-                                .fillMaxWidth(),
-                            textStyle = LocalTextStyle.current.copy(fontSize = 14.sp)
-                        )
-                        ExposedDropdownMenu(
-                            expanded = slotDropdownExpanded,
-                            onDismissRequest = { slotDropdownExpanded = false }
-                        ) {
-                            predefinedSlots.forEachIndexed { index, slot ->
-                                DropdownMenuItem(
-                                    text = { 
-                                        Text("${slot.label} (${formatTime(slot.startHour, slot.startMinute)} - ${formatTime(slot.endHour, slot.endMinute)})")
-                                    },
-                                    onClick = {
-                                        onTaskUpdate(
-                                            task.copy(
-                                                slotIndex = index,
-                                                startHour = slot.startHour,
-                                                startMinute = slot.startMinute,
-                                                endHour = slot.endHour,
-                                                endMinute = slot.endMinute
-                                            )
-                                        )
-                                        slotDropdownExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    // Custom Time Pickers
-                    Row(
+                // Time Pickers
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Start Time
+                    OutlinedButton(
+                        onClick = { showStartTimePicker = true },
                         modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
                     ) {
-                        // Start Time
-                        OutlinedButton(
-                            onClick = { showStartTimePicker = true },
-                            modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.AccessTime,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(formatTime(task.startHour, task.startMinute), fontSize = 13.sp)
-                        }
-                        
-                        Text("to", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        
-                        // End Time
-                        OutlinedButton(
-                            onClick = { showEndTimePicker = true },
-                            modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.AccessTime,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(formatTime(task.endHour, task.endMinute), fontSize = 13.sp)
-                        }
+                        Icon(
+                            Icons.Default.AccessTime,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(formatTime(task.startHour, task.startMinute), fontSize = 13.sp)
+                    }
+                    
+                    Text("to", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    
+                    // End Time
+                    OutlinedButton(
+                        onClick = { showEndTimePicker = true },
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.AccessTime,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(formatTime(task.endHour, task.endMinute), fontSize = 13.sp)
                     }
                 }
                 
@@ -283,7 +212,7 @@ fun TaskBlockCard(
             initialHour = task.startHour,
             initialMinute = task.startMinute,
             onConfirm = { hour, minute ->
-                onTaskUpdate(task.copy(startHour = hour, startMinute = minute, slotIndex = null))
+                onTaskUpdate(task.copy(startHour = hour, startMinute = minute))
                 showStartTimePicker = false
             },
             onDismiss = { showStartTimePicker = false }
@@ -295,7 +224,7 @@ fun TaskBlockCard(
             initialHour = task.endHour,
             initialMinute = task.endMinute,
             onConfirm = { hour, minute ->
-                onTaskUpdate(task.copy(endHour = hour, endMinute = minute, slotIndex = null))
+                onTaskUpdate(task.copy(endHour = hour, endMinute = minute))
                 showEndTimePicker = false
             },
             onDismiss = { showEndTimePicker = false }

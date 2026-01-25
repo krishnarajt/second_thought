@@ -105,13 +105,10 @@ fun SecondThoughtApp(viewModel: MainViewModel) {
                             selected = selected,
                             onClick = {
                                 navController.navigate(item.screen.route) {
-                                    // Pop up to the start destination to avoid building up a large stack
                                     popUpTo(navController.graph.findStartDestination().id) {
                                         saveState = true
                                     }
-                                    // Avoid multiple copies of the same destination
                                     launchSingleTop = true
-                                    // Restore state when reselecting a previously selected item
                                     restoreState = true
                                 }
                             }
@@ -161,8 +158,6 @@ fun SecondThoughtApp(viewModel: MainViewModel) {
                 MainScreen(
                     userName = settingsState.userName,
                     tasks = mainState.tasks,
-                    useSlots = mainState.useSlots,
-                    onUseSlotsChange = { viewModel.setUseSlots(it) },
                     onTaskUpdate = { index, task -> viewModel.updateTask(index, task) },
                     onTaskDelete = { index -> viewModel.deleteTask(index) },
                     onSaveClick = { viewModel.saveSchedule() },
@@ -179,8 +174,9 @@ fun SecondThoughtApp(viewModel: MainViewModel) {
                     remindOnStart = settingsState.remindOnStart,
                     nudgeDuring = settingsState.nudgeDuring,
                     congratulate = settingsState.congratulate,
-                    onSaveClick = { name, rb, rs, nd, cg ->
-                        viewModel.saveSettings(name, rb, rs, nd, cg)
+                    defaultSlotDuration = settingsState.defaultSlotDuration,
+                    onSaveClick = { name, rb, rs, nd, cg, dur ->
+                        viewModel.saveSettings(name, rb, rs, nd, cg, dur)
                     },
                     onLogoutClick = {
                         viewModel.logout()

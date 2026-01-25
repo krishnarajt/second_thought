@@ -1,8 +1,5 @@
 package com.kptgames.secondthought.data.model
 
-import java.time.LocalDate
-import java.time.LocalTime
-
 // Auth Request/Response models
 data class LoginRequest(
     val username: String,
@@ -34,7 +31,8 @@ data class UserSettings(
     val remindBeforeActivity: Boolean = true,
     val remindOnStart: Boolean = true,
     val nudgeDuringActivity: Boolean = true,
-    val congratulateOnFinish: Boolean = true
+    val congratulateOnFinish: Boolean = true,
+    val defaultSlotDuration: Int = 60
 )
 
 data class UpdateSettingsRequest(
@@ -42,7 +40,8 @@ data class UpdateSettingsRequest(
     val remindBeforeActivity: Boolean,
     val remindOnStart: Boolean,
     val nudgeDuringActivity: Boolean,
-    val congratulateOnFinish: Boolean
+    val congratulateOnFinish: Boolean,
+    val defaultSlotDuration: Int
 )
 
 data class ApiResponse(
@@ -50,27 +49,19 @@ data class ApiResponse(
     val message: String? = null
 )
 
-// Task/Schedule models
-data class TimeSlot(
-    val label: String,
-    val startHour: Int,
-    val startMinute: Int,
-    val endHour: Int,
-    val endMinute: Int
+// Duration options for settings dropdown
+data class DurationOption(
+    val minutes: Int,
+    val label: String
 )
 
-// Predefined slots
-val predefinedSlots = listOf(
-    TimeSlot("Early Morning", 5, 0, 7, 0),
-    TimeSlot("Morning", 7, 0, 9, 0),
-    TimeSlot("Late Morning", 9, 0, 11, 0),
-    TimeSlot("Midday", 11, 0, 13, 0),
-    TimeSlot("Early Afternoon", 13, 0, 15, 0),
-    TimeSlot("Afternoon", 15, 0, 17, 0),
-    TimeSlot("Evening", 17, 0, 19, 0),
-    TimeSlot("Night", 19, 0, 21, 0),
-    TimeSlot("Late Night", 21, 0, 23, 0),
-    TimeSlot("Midnight", 23, 0, 0, 0)
+val durationOptions = listOf(
+    DurationOption(15, "15 minutes"),
+    DurationOption(30, "30 minutes"),
+    DurationOption(45, "45 minutes"),
+    DurationOption(60, "1 hour"),
+    DurationOption(90, "1.5 hours"),
+    DurationOption(120, "2 hours")
 )
 
 // Task block for the schedule
@@ -80,8 +71,7 @@ data class TaskBlock(
     val startMinute: Int = 0,
     val endHour: Int = 10,
     val endMinute: Int = 0,
-    val task: String = "",
-    val slotIndex: Int? = null // null means custom time
+    val task: String = ""
 )
 
 // Daily schedule - this is what gets saved as JSON
@@ -89,7 +79,6 @@ data class DailySchedule(
     val date: String, // ISO format: "2025-01-25"
     val createdAt: String, // ISO timestamp
     val updatedAt: String, // ISO timestamp
-    val useSlots: Boolean,
     val tasks: List<TaskBlockJson>
 )
 
@@ -98,8 +87,7 @@ data class TaskBlockJson(
     val id: String,
     val startTime: String, // "HH:mm" format
     val endTime: String,   // "HH:mm" format
-    val task: String,
-    val slotName: String?  // null if custom time
+    val task: String
 )
 
 // API request for sending schedule
