@@ -30,7 +30,7 @@ import com.kptgames.secondthought.ui.viewmodel.MainViewModelFactory
 // ==========================================
 // DEV BYPASS FLAG - Set to false for production
 // ==========================================
-const val DEV_BYPASS_LOGIN = true
+const val DEV_BYPASS_LOGIN = false
 // ==========================================
 
 class MainActivity : ComponentActivity() {
