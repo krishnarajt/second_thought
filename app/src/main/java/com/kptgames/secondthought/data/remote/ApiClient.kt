@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit
 object ApiClient {
     
     // TODO: Change this to your actual backend URL
-    private const val BASE_URL = "https://your-backend-url.com/api/"
+    private const val BASE_URL = "https://second-thought.krishnarajthadesar.in/api/"
     
     private var apiService: ApiService? = null
     

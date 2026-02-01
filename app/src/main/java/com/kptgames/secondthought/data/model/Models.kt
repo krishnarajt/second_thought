@@ -32,7 +32,8 @@ data class UserSettings(
     val remindOnStart: Boolean = true,
     val nudgeDuringActivity: Boolean = true,
     val congratulateOnFinish: Boolean = true,
-    val defaultSlotDuration: Int = 60
+    val defaultSlotDuration: Int = 60,
+    val telegramLinked: Boolean = false
 )
 
 data class UpdateSettingsRequest(
@@ -93,4 +94,17 @@ data class TaskBlockJson(
 // API request for sending schedule
 data class SaveScheduleRequest(
     val schedule: DailySchedule
+)
+
+// Telegram link response
+data class TelegramLinkResponse(
+    val code: String,
+    val expiresAt: String,
+    val message: String
+)
+
+// Telegram unlink response
+data class TelegramUnlinkResponse(
+    val success: Boolean,
+    val message: String
 )

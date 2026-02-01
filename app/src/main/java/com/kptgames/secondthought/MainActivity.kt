@@ -37,26 +37,26 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        
+
         // Initialize dependencies
         val tokenManager = TokenManager(applicationContext)
         val fileManager = FileManager(applicationContext)
         val apiService = ApiClient.getInstance(tokenManager)
         val repository = Repository(apiService, tokenManager, fileManager)
-        
+
         setContent {
             SecondThoughtTheme {
                 val viewModel: MainViewModel = viewModel(
                     factory = MainViewModelFactory(repository, tokenManager)
                 )
-                
+
                 // Dev bypass - auto login during development
                 LaunchedEffect(Unit) {
                     if (DEV_BYPASS_LOGIN) {
                         viewModel.devBypassLogin()
                     }
                 }
-                
+
                 SecondThoughtApp(viewModel = viewModel)
             }
         }
@@ -69,7 +69,7 @@ fun SecondThoughtApp(viewModel: MainViewModel) {
     val authState by viewModel.authState.collectAsState()
     val settingsState by viewModel.settingsState.collectAsState()
     val mainState by viewModel.mainState.collectAsState()
-    
+
     // Navigate based on login state
     LaunchedEffect(authState.isLoggedIn) {
         if (authState.isLoggedIn) {
@@ -78,22 +78,23 @@ fun SecondThoughtApp(viewModel: MainViewModel) {
             }
         }
     }
-    
+
     // Determine if we should show bottom bar
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
-    val showBottomBar = currentDestination?.route in listOf(Screen.Main.route, Screen.Settings.route)
-    
+    val showBottomBar =
+        currentDestination?.route in listOf(Screen.Main.route, Screen.Settings.route)
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         bottomBar = {
             if (showBottomBar) {
                 NavigationBar {
                     bottomNavItems.forEach { item ->
-                        val selected = currentDestination?.hierarchy?.any { 
-                            it.route == item.screen.route 
+                        val selected = currentDestination?.hierarchy?.any {
+                            it.route == item.screen.route
                         } == true
-                        
+
                         NavigationBarItem(
                             icon = {
                                 Icon(
@@ -137,7 +138,7 @@ fun SecondThoughtApp(viewModel: MainViewModel) {
                     errorMessage = authState.errorMessage
                 )
             }
-            
+
             // Signup Screen
             composable(Screen.Signup.route) {
                 SignupScreen(
@@ -152,7 +153,7 @@ fun SecondThoughtApp(viewModel: MainViewModel) {
                     errorMessage = authState.errorMessage
                 )
             }
-            
+
             // Main Screen
             composable(Screen.Main.route) {
                 MainScreen(
@@ -165,9 +166,14 @@ fun SecondThoughtApp(viewModel: MainViewModel) {
                     saveMessage = mainState.saveMessage
                 )
             }
-            
+
             // Settings Screen
             composable(Screen.Settings.route) {
+                // Load settings from backend when entering settings screen
+                LaunchedEffect(Unit) {
+                    viewModel.loadSettingsFromBackend()
+                }
+
                 SettingsScreen(
                     currentName = settingsState.userName,
                     remindBefore = settingsState.remindBefore,
@@ -175,8 +181,21 @@ fun SecondThoughtApp(viewModel: MainViewModel) {
                     nudgeDuring = settingsState.nudgeDuring,
                     congratulate = settingsState.congratulate,
                     defaultSlotDuration = settingsState.defaultSlotDuration,
+                    telegramLinked = settingsState.telegramLinked,
+                    telegramLinkCode = settingsState.telegramLinkCode,
+                    telegramMessage = settingsState.telegramMessage,
+                    isTelegramLoading = settingsState.isTelegramLoading,
                     onSaveClick = { name, rb, rs, nd, cg, dur ->
                         viewModel.saveSettings(name, rb, rs, nd, cg, dur)
+                    },
+                    onGetTelegramCodeClick = {
+                        viewModel.getTelegramLinkCode()
+                    },
+                    onUnlinkTelegramClick = {
+                        viewModel.unlinkTelegram()
+                    },
+                    onClearTelegramMessage = {
+                        viewModel.clearTelegramMessage()
                     },
                     onLogoutClick = {
                         viewModel.logout()

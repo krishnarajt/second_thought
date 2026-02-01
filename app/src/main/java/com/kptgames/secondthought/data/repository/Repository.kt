@@ -18,14 +18,14 @@ class Repository(
     private val tokenManager: TokenManager,
     private val fileManager: FileManager
 ) {
-    
+
     // Login
     suspend fun login(username: String, password: String): Result<AuthResponse> {
         // Skip API in dev mode
         if (DEV_BYPASS_LOGIN) {
             return Result.Success(AuthResponse("dev_token", "dev_refresh", "Dev mode"))
         }
-        
+
         return try {
             val response = apiService.login(LoginRequest(username, password))
             if (response.isSuccessful && response.body() != null) {
@@ -39,14 +39,14 @@ class Repository(
             Result.Error(e.message ?: "Network error")
         }
     }
-    
+
     // Signup
     suspend fun signup(username: String, password: String): Result<AuthResponse> {
         // Skip API in dev mode
         if (DEV_BYPASS_LOGIN) {
             return Result.Success(AuthResponse("dev_token", "dev_refresh", "Dev mode"))
         }
-        
+
         return try {
             val response = apiService.signup(SignupRequest(username, password))
             if (response.isSuccessful && response.body() != null) {
@@ -60,14 +60,14 @@ class Repository(
             Result.Error(e.message ?: "Network error")
         }
     }
-    
+
     // Refresh token
     suspend fun refreshToken(): Result<RefreshResponse> {
         // Skip API in dev mode
         if (DEV_BYPASS_LOGIN) {
             return Result.Success(RefreshResponse("dev_token"))
         }
-        
+
         return try {
             val refreshToken = tokenManager.getRefreshToken() ?: return Result.Error("No refresh token")
             val response = apiService.refreshToken(RefreshRequest(refreshToken))
@@ -82,19 +82,19 @@ class Repository(
             Result.Error(e.message ?: "Network error")
         }
     }
-    
+
     // Logout
     suspend fun logout() {
         tokenManager.clearTokens()
     }
-    
+
     // Get user settings
     suspend fun getSettings(): Result<UserSettings> {
         // Skip API in dev mode
         if (DEV_BYPASS_LOGIN) {
             return Result.Success(UserSettings("Dev User"))
         }
-        
+
         return try {
             val response = apiService.getSettings()
             if (response.isSuccessful && response.body() != null) {
@@ -106,7 +106,7 @@ class Repository(
             Result.Error(e.message ?: "Network error")
         }
     }
-    
+
     // Update user settings (name + notification preferences + slot duration)
     suspend fun updateSettings(
         name: String,
@@ -120,12 +120,12 @@ class Repository(
         tokenManager.saveUserName(name)
         tokenManager.saveNotificationSettings(remindBefore, remindOnStart, nudgeDuring, congratulate)
         tokenManager.saveDefaultSlotDuration(slotDuration)
-        
+
         // Skip API in dev mode
         if (DEV_BYPASS_LOGIN) {
             return Result.Success(ApiResponse(true, "Saved locally (dev mode)"))
         }
-        
+
         return try {
             val response = apiService.updateSettings(
                 UpdateSettingsRequest(name, remindBefore, remindOnStart, nudgeDuring, congratulate, slotDuration)
@@ -139,21 +139,21 @@ class Repository(
             Result.Success(ApiResponse(true, "Saved locally (offline)"))
         }
     }
-    
+
     // Save schedule - saves to file AND sends to API
     suspend fun saveSchedule(schedule: DailySchedule): Result<String> {
         // Save to internal storage first (always works)
         fileManager.saveScheduleInternal(schedule)
-        
+
         // Save to Downloads folder (user accessible)
         val fileResult = fileManager.saveScheduleToFile(schedule)
         val filePath = fileResult.getOrElse { "Saved to app storage" }
-        
+
         // Skip API in dev mode
         if (DEV_BYPASS_LOGIN) {
             return Result.Success("$filePath\n(Dev mode - API skipped)")
         }
-        
+
         // Send to backend API
         return try {
             val response = apiService.saveSchedule(SaveScheduleRequest(schedule))
@@ -166,9 +166,53 @@ class Repository(
             Result.Success("$filePath\n(Offline - will sync later)")
         }
     }
-    
+
     // Load today's schedule from local storage
     fun loadScheduleFromFile(date: String): DailySchedule? {
         return fileManager.loadScheduleInternal(date)
+    }
+
+    // Get Telegram link code
+    suspend fun getTelegramLinkCode(): Result<TelegramLinkResponse> {
+        // Skip API in dev mode
+        if (DEV_BYPASS_LOGIN) {
+            return Result.Success(
+                TelegramLinkResponse(
+                    code = "DEV123",
+                    expiresAt = "",
+                    message = "Dev mode - use code DEV123"
+                )
+            )
+        }
+
+        return try {
+            val response = apiService.getTelegramLinkCode()
+            if (response.isSuccessful && response.body() != null) {
+                Result.Success(response.body()!!)
+            } else {
+                Result.Error(response.message() ?: "Failed to get link code")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
+    }
+
+    // Unlink Telegram account
+    suspend fun unlinkTelegram(): Result<ApiResponse> {
+        // Skip API in dev mode
+        if (DEV_BYPASS_LOGIN) {
+            return Result.Success(ApiResponse(true, "Telegram unlinked (dev mode)"))
+        }
+
+        return try {
+            val response = apiService.unlinkTelegram()
+            if (response.isSuccessful && response.body() != null) {
+                Result.Success(response.body()!!)
+            } else {
+                Result.Error(response.message() ?: "Failed to unlink Telegram")
+            }
+        } catch (e: Exception) {
+            Result.Error(e.message ?: "Network error")
+        }
     }
 }

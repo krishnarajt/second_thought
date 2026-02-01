@@ -23,7 +23,14 @@ fun SettingsScreen(
     nudgeDuring: Boolean,
     congratulate: Boolean,
     defaultSlotDuration: Int,
+    telegramLinked: Boolean,
+    telegramLinkCode: String?,
+    telegramMessage: String?,
+    isTelegramLoading: Boolean,
     onSaveClick: (name: String, remindBefore: Boolean, remindOnStart: Boolean, nudgeDuring: Boolean, congratulate: Boolean, slotDuration: Int) -> Unit,
+    onGetTelegramCodeClick: () -> Unit,
+    onUnlinkTelegramClick: () -> Unit,
+    onClearTelegramMessage: () -> Unit,
     onLogoutClick: () -> Unit,
     isLoading: Boolean = false,
     saveSuccess: Boolean = false
@@ -194,6 +201,158 @@ fun SettingsScreen(
             subtitle = "Celebrate when you complete a task",
             enabled = !isLoading
         )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Telegram section
+        Text(
+            text = "Telegram Integration",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.primary
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        if (telegramLinked) {
+            // Telegram is linked
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        text = "✓ Telegram Connected",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "You'll receive notifications on Telegram",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick = onUnlinkTelegramClick,
+                        enabled = !isTelegramLoading,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        if (isTelegramLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text("Unlink Telegram")
+                        }
+                    }
+                }
+            }
+        } else {
+            // Telegram not linked
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        text = "Link Telegram Account",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Get your schedule reminders on Telegram",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    if (telegramLinkCode != null) {
+                        // Show the code
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "Your Link Code:",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = telegramLinkCode,
+                                    fontSize = 24.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = telegramMessage ?: "",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = onClearTelegramMessage,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Close")
+                        }
+                    } else {
+                        Button(
+                            onClick = onGetTelegramCodeClick,
+                            enabled = !isTelegramLoading,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            if (isTelegramLoading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                            } else {
+                                Text("Get Link Code")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Telegram error/success message
+        if (telegramMessage != null && telegramLinkCode == null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = telegramMessage,
+                color = if (telegramMessage.startsWith("Error"))
+                    MaterialTheme.colorScheme.error
+                else
+                    MaterialTheme.colorScheme.primary,
+                fontSize = 14.sp
+            )
+        }
 
         // Success message
         if (showSuccessMessage) {
