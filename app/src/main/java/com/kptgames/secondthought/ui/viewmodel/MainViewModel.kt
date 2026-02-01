@@ -111,6 +111,13 @@ class MainViewModel(
             }
         }
 
+        // Load Telegram linked status
+        viewModelScope.launch {
+            tokenManager.getTelegramLinked().collect { isLinked ->
+                _settingsState.value = _settingsState.value.copy(telegramLinked = isLinked)
+            }
+        }
+
         // Load today's schedule if exists
         loadTodaySchedule()
     }
@@ -350,6 +357,14 @@ class MainViewModel(
 
     // Get Telegram link code
     fun getTelegramLinkCode() {
+        // Don't allow getting code if already linked
+        if (_settingsState.value.telegramLinked) {
+            _settingsState.value = _settingsState.value.copy(
+                telegramMessage = "Telegram is already linked to your account"
+            )
+            return
+        }
+
         viewModelScope.launch {
             _settingsState.value = _settingsState.value.copy(
                 isTelegramLoading = true,
@@ -387,6 +402,9 @@ class MainViewModel(
 
             when (val result = repository.unlinkTelegram()) {
                 is Result.Success -> {
+                    // Save unlinked status locally
+                    tokenManager.saveTelegramLinked(false)
+
                     _settingsState.value = _settingsState.value.copy(
                         isTelegramLoading = false,
                         telegramLinked = false,

@@ -88,17 +88,20 @@ class Repository(
         tokenManager.clearTokens()
     }
 
-    // Get user settings
+    // Get user settings (including Telegram status)
     suspend fun getSettings(): Result<UserSettings> {
         // Skip API in dev mode
         if (DEV_BYPASS_LOGIN) {
-            return Result.Success(UserSettings("Dev User"))
+            return Result.Success(UserSettings("Dev User", telegramLinked = false))
         }
 
         return try {
             val response = apiService.getSettings()
             if (response.isSuccessful && response.body() != null) {
-                Result.Success(response.body()!!)
+                val settings = response.body()!!
+                // Save Telegram status locally
+                tokenManager.saveTelegramLinked(settings.telegramLinked)
+                Result.Success(settings)
             } else {
                 Result.Error(response.message() ?: "Failed to get settings")
             }
