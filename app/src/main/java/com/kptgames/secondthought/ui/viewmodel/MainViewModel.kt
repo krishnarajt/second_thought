@@ -45,7 +45,10 @@ data class SettingsUiState(
 data class MainUiState(
     val tasks: List<TaskBlock> = listOf(TaskBlock()),
     val isSaving: Boolean = false,
-    val saveMessage: String? = null
+    val saveMessage: String? = null,
+    val currentDate: LocalDate = LocalDate.now(),
+    val isLoadingSchedule: Boolean = false,
+    val loadScheduleError: String? = null
 )
 
 class MainViewModel(
@@ -70,7 +73,16 @@ class MainViewModel(
         if (!DEV_BYPASS_LOGIN) {
             viewModelScope.launch {
                 tokenManager.isLoggedIn.collect { isLoggedIn ->
-                    _authState.value = _authState.value.copy(isLoggedIn = isLoggedIn)
+                    val currentlyLoggedIn = _authState.value.isLoggedIn
+
+                    // If user was logged in but now isn't (tokens cleared), force logout
+                    if (currentlyLoggedIn && !isLoggedIn) {
+                        _authState.value = AuthUiState(isLoggedIn = false)
+                        _settingsState.value = SettingsUiState()
+                        _mainState.value = MainUiState()
+                    } else {
+                        _authState.value = _authState.value.copy(isLoggedIn = isLoggedIn)
+                    }
                 }
             }
         }
@@ -314,26 +326,91 @@ class MainViewModel(
         }
     }
 
-    // Load today's schedule from local storage
+    // Load today's schedule - try from backend first, fallback to local
     private fun loadTodaySchedule() {
         viewModelScope.launch {
             val dateStr = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
-            val schedule = repository.loadScheduleFromFile(dateStr)
 
-            if (schedule != null && schedule.tasks.isNotEmpty()) {
-                val tasks = schedule.tasks.map { taskJson ->
-                    val startParts = taskJson.startTime.split(":")
-                    val endParts = taskJson.endTime.split(":")
-                    TaskBlock(
-                        id = taskJson.id,
-                        startHour = startParts[0].toIntOrNull() ?: 9,
-                        startMinute = startParts[1].toIntOrNull() ?: 0,
-                        endHour = endParts[0].toIntOrNull() ?: 10,
-                        endMinute = endParts[1].toIntOrNull() ?: 0,
-                        task = taskJson.task
+            // Try to sync from backend
+            when (val result = repository.syncTodaySchedule(dateStr)) {
+                is Result.Success -> {
+                    val schedule = result.data
+                    if (schedule.tasks.isNotEmpty()) {
+                        val tasks = schedule.tasks.map { taskJson ->
+                            val startParts = taskJson.startTime.split(":")
+                            val endParts = taskJson.endTime.split(":")
+                            TaskBlock(
+                                id = taskJson.id,
+                                startHour = startParts[0].toIntOrNull() ?: 9,
+                                startMinute = startParts[1].toIntOrNull() ?: 0,
+                                endHour = endParts[0].toIntOrNull() ?: 10,
+                                endMinute = endParts[1].toIntOrNull() ?: 0,
+                                task = taskJson.task
+                            )
+                        }
+                        _mainState.value = _mainState.value.copy(tasks = tasks)
+                    }
+                }
+                is Result.Error -> {
+                    // Sync failed, keep existing state (empty or previously loaded)
+                }
+                is Result.Loading -> {}
+            }
+        }
+    }
+
+    // Manually trigger schedule sync (call when returning to main screen)
+    fun syncSchedule() {
+        loadTodaySchedule()
+    }
+
+    // Load schedule for a specific date
+    fun loadScheduleForDate(date: LocalDate) {
+        viewModelScope.launch {
+            _mainState.value = _mainState.value.copy(
+                isLoadingSchedule = true,
+                loadScheduleError = null,
+                currentDate = date
+            )
+
+            val dateStr = date.format(DateTimeFormatter.ISO_LOCAL_DATE)
+
+            when (val result = repository.getScheduleByDate(dateStr)) {
+                is Result.Success -> {
+                    val schedule = result.data
+                    if (schedule.tasks.isNotEmpty()) {
+                        val tasks = schedule.tasks.map { taskJson ->
+                            val startParts = taskJson.startTime.split(":")
+                            val endParts = taskJson.endTime.split(":")
+                            TaskBlock(
+                                id = taskJson.id,
+                                startHour = startParts[0].toIntOrNull() ?: 9,
+                                startMinute = startParts[1].toIntOrNull() ?: 0,
+                                endHour = endParts[0].toIntOrNull() ?: 10,
+                                endMinute = endParts[1].toIntOrNull() ?: 0,
+                                task = taskJson.task
+                            )
+                        }
+                        _mainState.value = _mainState.value.copy(
+                            tasks = tasks,
+                            isLoadingSchedule = false
+                        )
+                    } else {
+                        // Empty schedule - show one empty task block
+                        _mainState.value = _mainState.value.copy(
+                            tasks = listOf(TaskBlock()),
+                            isLoadingSchedule = false
+                        )
+                    }
+                }
+                is Result.Error -> {
+                    _mainState.value = _mainState.value.copy(
+                        isLoadingSchedule = false,
+                        loadScheduleError = result.message,
+                        tasks = listOf(TaskBlock()) // Reset to empty on error
                     )
                 }
-                _mainState.value = _mainState.value.copy(tasks = tasks)
+                is Result.Loading -> {}
             }
         }
     }

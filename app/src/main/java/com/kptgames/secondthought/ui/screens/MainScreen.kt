@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,17 +26,25 @@ import java.time.format.DateTimeFormatter
 fun MainScreen(
     userName: String,
     tasks: List<TaskBlock>,
+    currentDate: LocalDate,
+    isLoadingSchedule: Boolean,
+    loadScheduleError: String?,
     onTaskUpdate: (Int, TaskBlock) -> Unit,
     onTaskDelete: (Int) -> Unit,
     onSaveClick: () -> Unit,
+    onLoadSchedule: (LocalDate) -> Unit,
     isSaving: Boolean = false,
     saveMessage: String? = null
 ) {
-    val currentDate = LocalDate.now()
+    var showDatePicker by remember { mutableStateOf(false) }
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = currentDate.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+    )
+
     val currentTime = LocalTime.now()
     val dateFormatter = DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy")
     val timeFormatter = DateTimeFormatter.ofPattern("h:mm a")
-    
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -58,9 +67,67 @@ fun MainScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        
-        Spacer(modifier = Modifier.height(20.dp))
-        
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Load Schedule Section - Compact horizontal layout
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Date Picker Button
+            OutlinedButton(
+                onClick = { showDatePicker = true },
+                modifier = Modifier.weight(1f),
+                enabled = !isLoadingSchedule,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
+            ) {
+                Icon(
+                    Icons.Default.CalendarToday,
+                    contentDescription = "Select Date",
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = if (currentDate == LocalDate.now()) "Today"
+                    else currentDate.format(DateTimeFormatter.ofPattern("MMM d")),
+                    fontSize = 14.sp
+                )
+            }
+
+            // Load Button
+            Button(
+                onClick = { onLoadSchedule(currentDate) },
+                enabled = !isLoadingSchedule,
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
+            ) {
+                if (isLoadingSchedule) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Text("Load Schedule", fontSize = 14.sp)
+                }
+            }
+        }
+
+        // Error message if load failed
+        if (loadScheduleError != null) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = loadScheduleError,
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         // Task List
         LazyColumn(
             modifier = Modifier.weight(1f),
@@ -75,7 +142,7 @@ fun MainScreen(
                 )
             }
         }
-        
+
         // Save Message
         if (saveMessage != null) {
             Spacer(modifier = Modifier.height(8.dp))
@@ -86,9 +153,9 @@ fun MainScreen(
                 modifier = Modifier.fillMaxWidth()
             )
         }
-        
+
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         // Save Button
         Button(
             onClick = onSaveClick,
@@ -107,6 +174,35 @@ fun MainScreen(
             }
         }
     }
+
+    // Date Picker Dialog
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            val selectedDate = java.time.Instant.ofEpochMilli(millis)
+                                .atZone(java.time.ZoneId.systemDefault())
+                                .toLocalDate()
+                            onLoadSchedule(selectedDate)
+                        }
+                        showDatePicker = false
+                    }
+                ) {
+                    Text("Load")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Cancel")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -119,7 +215,7 @@ fun TaskBlockCard(
 ) {
     var showStartTimePicker by remember { mutableStateOf(false) }
     var showEndTimePicker by remember { mutableStateOf(false) }
-    
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -156,9 +252,9 @@ fun TaskBlockCard(
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(formatTime(task.startHour, task.startMinute), fontSize = 13.sp)
                     }
-                    
+
                     Text("to", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    
+
                     // End Time
                     OutlinedButton(
                         onClick = { showEndTimePicker = true },
@@ -174,7 +270,7 @@ fun TaskBlockCard(
                         Text(formatTime(task.endHour, task.endMinute), fontSize = 13.sp)
                     }
                 }
-                
+
                 // Delete Button
                 if (showDelete) {
                     IconButton(
@@ -189,9 +285,9 @@ fun TaskBlockCard(
                     }
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(8.dp))
-            
+
             // Task Text Field
             OutlinedTextField(
                 value = task.task,
@@ -205,7 +301,7 @@ fun TaskBlockCard(
             )
         }
     }
-    
+
     // Time Picker Dialogs
     if (showStartTimePicker) {
         TimePickerDialog(
@@ -218,7 +314,7 @@ fun TaskBlockCard(
             onDismiss = { showStartTimePicker = false }
         )
     }
-    
+
     if (showEndTimePicker) {
         TimePickerDialog(
             initialHour = task.endHour,
@@ -245,7 +341,7 @@ fun TimePickerDialog(
         initialMinute = initialMinute,
         is24Hour = false
     )
-    
+
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {

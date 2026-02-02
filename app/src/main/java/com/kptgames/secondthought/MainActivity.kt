@@ -82,8 +82,7 @@ fun SecondThoughtApp(viewModel: MainViewModel) {
     // Determine if we should show bottom bar
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
-    val showBottomBar =
-        currentDestination?.route in listOf(Screen.Main.route, Screen.Settings.route)
+    val showBottomBar = currentDestination?.route in listOf(Screen.Main.route, Screen.Settings.route)
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -156,12 +155,21 @@ fun SecondThoughtApp(viewModel: MainViewModel) {
 
             // Main Screen
             composable(Screen.Main.route) {
+                // Sync schedule from backend when entering main screen
+                LaunchedEffect(Unit) {
+                    viewModel.syncSchedule()
+                }
+
                 MainScreen(
                     userName = settingsState.userName,
                     tasks = mainState.tasks,
+                    currentDate = mainState.currentDate,
+                    isLoadingSchedule = mainState.isLoadingSchedule,
+                    loadScheduleError = mainState.loadScheduleError,
                     onTaskUpdate = { index, task -> viewModel.updateTask(index, task) },
                     onTaskDelete = { index -> viewModel.deleteTask(index) },
                     onSaveClick = { viewModel.saveSchedule() },
+                    onLoadSchedule = { date -> viewModel.loadScheduleForDate(date) },
                     isSaving = mainState.isSaving,
                     saveMessage = mainState.saveMessage
                 )

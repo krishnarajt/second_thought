@@ -175,6 +175,84 @@ class Repository(
         return fileManager.loadScheduleInternal(date)
     }
 
+    // Sync today's schedule from backend
+    suspend fun syncTodaySchedule(date: String): Result<DailySchedule> {
+        // Skip API in dev mode - load from local storage only
+        if (DEV_BYPASS_LOGIN) {
+            val localSchedule = loadScheduleFromFile(date)
+            return if (localSchedule != null) {
+                Result.Success(localSchedule)
+            } else {
+                Result.Error("No schedule found")
+            }
+        }
+
+        return try {
+            val response = apiService.getTodaySchedule()
+            if (response.isSuccessful && response.body() != null) {
+                val schedule = response.body()!!
+                // Save to local storage
+                fileManager.saveScheduleInternal(schedule)
+                Result.Success(schedule)
+            } else {
+                // If backend fails, try loading from local storage
+                val localSchedule = loadScheduleFromFile(date)
+                if (localSchedule != null) {
+                    Result.Success(localSchedule)
+                } else {
+                    Result.Error(response.message() ?: "Failed to get schedule")
+                }
+            }
+        } catch (e: Exception) {
+            // If network error, try loading from local storage
+            val localSchedule = loadScheduleFromFile(date)
+            if (localSchedule != null) {
+                Result.Success(localSchedule)
+            } else {
+                Result.Error(e.message ?: "Network error")
+            }
+        }
+    }
+
+    // Get schedule by specific date
+    suspend fun getScheduleByDate(date: String): Result<DailySchedule> {
+        // Skip API in dev mode - load from local storage only
+        if (DEV_BYPASS_LOGIN) {
+            val localSchedule = loadScheduleFromFile(date)
+            return if (localSchedule != null) {
+                Result.Success(localSchedule)
+            } else {
+                Result.Error("No schedule found")
+            }
+        }
+
+        return try {
+            val response = apiService.getScheduleByDate(date)
+            if (response.isSuccessful && response.body() != null) {
+                val schedule = response.body()!!
+                // Save to local storage
+                fileManager.saveScheduleInternal(schedule)
+                Result.Success(schedule)
+            } else {
+                // If backend fails, try loading from local storage
+                val localSchedule = loadScheduleFromFile(date)
+                if (localSchedule != null) {
+                    Result.Success(localSchedule)
+                } else {
+                    Result.Error(response.message() ?: "Failed to get schedule")
+                }
+            }
+        } catch (e: Exception) {
+            // If network error, try loading from local storage
+            val localSchedule = loadScheduleFromFile(date)
+            if (localSchedule != null) {
+                Result.Success(localSchedule)
+            } else {
+                Result.Error(e.message ?: "Network error")
+            }
+        }
+    }
+
     // Get Telegram link code
     suspend fun getTelegramLinkCode(): Result<TelegramLinkResponse> {
         // Skip API in dev mode

@@ -33,6 +33,9 @@ interface ApiService {
     @GET("schedule/today")
     suspend fun getTodaySchedule(): Response<DailySchedule>
 
+    @GET("schedule/{date}")
+    suspend fun getScheduleByDate(@retrofit2.http.Path("date") date: String): Response<DailySchedule>
+
     // Telegram endpoints
     @POST("user/telegram/link")
     suspend fun getTelegramLinkCode(): Response<TelegramLinkResponse>
