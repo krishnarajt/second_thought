@@ -170,6 +170,9 @@ fun SecondThoughtApp(viewModel: MainViewModel) {
                     onTaskDelete = { index -> viewModel.deleteTask(index) },
                     onSaveClick = { viewModel.saveSchedule() },
                     onLoadSchedule = { date -> viewModel.loadScheduleForDate(date) },
+                    onAddTimebox = { viewModel.addTimebox() },
+                    onInsertBetween = { indexBefore, minutes -> viewModel.insertBetween(indexBefore, minutes) },
+                    adjustError = mainState.adjustError,
                     isSaving = mainState.isSaving,
                     saveMessage = mainState.saveMessage
                 )
